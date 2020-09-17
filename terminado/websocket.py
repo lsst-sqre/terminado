@@ -2,15 +2,8 @@
 """
 # Copyright (c) Jupyter Development Team
 # Copyright (c) 2014, Ramalingam Saravanan <sarava@sarava.net>
+# Copyright (c) 2020, Adam Thornton <athornton@lsst.org>
 # Distributed under the terms of the Simplified BSD License.
-
-from __future__ import absolute_import, print_function
-
-# Python3-friendly imports
-try:
-    from urllib.parse import urlparse
-except ImportError:
-    from urlparse import urlparse
 
 import json
 import logging
@@ -39,6 +32,9 @@ class TermSocket(tornado.websocket.WebSocketHandler):
         self.write_buffer = deque()
 
         self._logger = logging.getLogger(__name__)
+        logfmt = ("%(color)s[%(levelname)1.1s %(asctime)s.%(msecs).03d" +
+                  " %(name)s %(module)s:%(lineno)d]%(end_color)s %(message)s")
+        self._logger.setFormatter(logging.Formatter(fmt=logfmt))
 
     def origin_check(self, origin=None):
         """Deprecated: backward-compat for terminado <= 0.5."""
@@ -70,6 +66,7 @@ class TermSocket(tornado.websocket.WebSocketHandler):
         self._logger.info("TermSocket.open: Opened %s", self.term_name)
 
     def flush_write_buffer(self):
+        self._logger.error("Flushing write buffer.")
         if not self.is_open:
             self._logger.warning("No terminal is open; cannot drain buffer!")
             return
@@ -83,9 +80,10 @@ class TermSocket(tornado.websocket.WebSocketHandler):
         #  process, because there's nothing to receive this message until
         #  the term socket is opened.  It _seems_ like the
         #  terminal.read_buffer should be doing this, but it isn't.
+        self._logger.error("on_pty_read: {}".format(text))
         if not self.is_open:
             self.write_buffer.append(text)
-            self._logger.info("Buffering output until terminal is open.")
+            self._logger.info("Buffering output.")
             return
         self.send_json_message(['stdout', text])
 
@@ -119,6 +117,7 @@ class TermSocket(tornado.websocket.WebSocketHandler):
             self.terminal.clients.remove(self)
             self.terminal.resize_to_smallest()
         self.term_manager.client_disconnected(self)
+        self.is_open = False
 
     def on_pty_died(self):
         """Terminal closed: tell the frontend, and close the socket.
