@@ -205,7 +205,7 @@ class TermManagerBase(object):
             s = ptywclients.ptyproc.read(65536)
             self.log.error("Read from fd {}: {}".format(fd, s))
             ptywclients.read_buffer.append(s)
-            cll = ptyclients.clients
+            cll = ptywclients.clients
             self.log.error("Clients for fd: {}".format(cll))
             for client in ptywclients.clients:
                 client.on_pty_read(s)
@@ -216,7 +216,7 @@ class TermManagerBase(object):
 
     def get_terminal(self, url_component=None):
         """Override in a subclass to give a terminal to a new websocket connection
-        
+
         The :class:`TermSocket` handler works with zero or one URL components
         (capturing groups in the URL spec regex). If it receives one, it is
         passed as the ``url_component`` parameter; otherwise, this is None.
@@ -244,6 +244,7 @@ class TermManagerBase(object):
 
 class SingleTermManager(TermManagerBase):
     """All connections to the websocket share a common terminal."""
+
     def __init__(self, **kwargs):
         super(SingleTermManager, self).__init__(**kwargs)
         self.terminal = None
