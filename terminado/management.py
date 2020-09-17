@@ -55,7 +55,7 @@ class PtyWithClients(object):
         argv = ptyproc_setup.argv
         env = ptyproc_setup.env
         cwd = ptyproc_setup.cwd
-        self.log("Pty: argv: '{}', env: '{}', cwd: '{}'".format(
+        self.log.error("Pty: argv: '{}', env: '{}', cwd: '{}'".format(
             argv, env, cwd))
         self.ptyproc = PtyProcessUnicode.spawn(argv=argv, env=env, cwd=cwd)
 
