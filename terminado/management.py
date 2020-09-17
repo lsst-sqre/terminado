@@ -41,14 +41,14 @@ class PtyProcSetup(object):
 
 class PtyWithClients(object):
     def __init__(self, ptyproc_setup):
-        self.ptyproc = PtyProcessUnicode.spawn(argv=ptyproc_setup.argv,
-                                               env=ptyproc_setup.env,
-                                               cwd=ptyproc_setup.cwd)
         self.clients = []
         # Store the last few things read, so when a new client connects,
         # it can show e.g. the most recent prompt, rather than absolutely
         # nothing.
         self.read_buffer = deque([], maxlen=10)
+        self.ptyproc = PtyProcessUnicode.spawn(argv=ptyproc_setup.argv,
+                                               env=ptyproc_setup.env,
+                                               cwd=ptyproc_setup.cwd)
 
     def resize_to_smallest(self):
         """Set the terminal size to that of the smallest client dimensions.
@@ -218,7 +218,7 @@ class TermManagerBase(object):
 
     def get_terminal(self, url_component=None):
         """Override in a subclass to give a terminal to a new websocket connection
-        
+
         The :class:`TermSocket` handler works with zero or one URL components
         (capturing groups in the URL spec regex). If it receives one, it is
         passed as the ``url_component`` parameter; otherwise, this is None.
@@ -246,6 +246,7 @@ class TermManagerBase(object):
 
 class SingleTermManager(TermManagerBase):
     """All connections to the websocket share a common terminal."""
+
     def __init__(self, **kwargs):
         super(SingleTermManager, self).__init__(**kwargs)
         self.terminal = None
@@ -255,11 +256,12 @@ class SingleTermManager(TermManagerBase):
             self.terminal = self.new_terminal()
             self.start_reading(self.terminal)
         return self.terminal
-    
+
     @gen.coroutine
     def kill_all(self):
         yield super(SingleTermManager, self).kill_all()
         self.terminal = None
+
 
 class MaxTerminalsReached(Exception):
     def __init__(self, max_terminals):
