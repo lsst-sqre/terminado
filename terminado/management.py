@@ -31,6 +31,9 @@ ENV_PREFIX = "PYXTERM_"         # Environment variable prefix
 
 DEFAULT_TERM_TYPE = "xterm"
 
+LOGFMT = ("%(color)s[%(levelname)1.1s %(asctime)s.%(msecs).03d" +
+          " %(name)s %(module)s:%(lineno)d]%(end_color)s %(message)s")
+
 
 class PtyProcSetup(object):
     def __init__(self, argv=None, env=None, cwd=None):
@@ -41,6 +44,9 @@ class PtyProcSetup(object):
 
 class PtyWithClients(object):
     def __init__(self, ptyproc_setup):
+        self.log = logging.getLogger(__name__)
+        for h in self.log.handlers:
+            h.setFormatter(logging.formatter(LOGFMT))
         self.clients = []
         # Store the last few things read, so when a new client connects,
         # it can show e.g. the most recent prompt, rather than absolutely
@@ -208,6 +214,7 @@ class TermManagerBase(object):
         ptywclients = self.ptys_by_fd[fd]
         try:
             s = ptywclients.ptyproc.read(65536)
+            self.log.error("READ DATA: {}".format(s))
             ptywclients.read_buffer.append(s)
             for client in ptywclients.clients:
                 client.on_pty_read(s)
@@ -266,12 +273,14 @@ class SingleTermManager(TermManagerBase):
 class MaxTerminalsReached(Exception):
     def __init__(self, max_terminals):
         self.max_terminals = max_terminals
-    
+
     def __str__(self):
         return "Cannot create more than %d terminals" % self.max_terminals
 
+
 class UniqueTermManager(TermManagerBase):
     """Give each websocket a unique terminal to use."""
+
     def __init__(self, max_terminals=None, **kwargs):
         super(UniqueTermManager, self).__init__(**kwargs)
         self.max_terminals = max_terminals
@@ -300,6 +309,7 @@ class UniqueTermManager(TermManagerBase):
 class NamedTermManager(TermManagerBase):
     """Share terminals between websockets connected to the same endpoint.
     """
+
     def __init__(self, max_terminals=None, **kwargs):
         super(NamedTermManager, self).__init__(**kwargs)
         self.max_terminals = max_terminals
@@ -307,10 +317,10 @@ class NamedTermManager(TermManagerBase):
 
     def get_terminal(self, term_name):
         assert term_name is not None
-        
+
         if term_name in self.terminals:
             return self.terminals[term_name]
-        
+
         if self.max_terminals and len(self.terminals) >= self.max_terminals:
             raise MaxTerminalsReached(self.max_terminals)
 
@@ -347,13 +357,13 @@ class NamedTermManager(TermManagerBase):
     def terminate(self, name, force=False):
         term = self.terminals[name]
         yield term.terminate(force=force)
-    
+
     def on_eof(self, ptywclients):
         super(NamedTermManager, self).on_eof(ptywclients)
         name = ptywclients.term_name
         self.log.info("Terminal %s closed", name)
         self.terminals.pop(name, None)
-    
+
     @gen.coroutine
     def kill_all(self):
         yield super(NamedTermManager, self).kill_all()
