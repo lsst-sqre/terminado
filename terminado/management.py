@@ -39,7 +39,7 @@ class PtyWithClients(object):
         # Store the last few things read, so when a new client connects,
         # it can show e.g. the most recent prompt, rather than absolutely
         # nothing.
-        self.read_buffer = deque([], maxlen=10)
+        self.read_buffer = deque([], maxlen=100)
 
     def resize_to_smallest(self):
         """Set the terminal size to that of the smallest client dimensions.
@@ -137,6 +137,10 @@ class TermManagerBase(object):
         self.term_settings = term_settings
         self.extra_env = extra_env
         self.log = logging.getLogger(__name__)
+        logfmt = ("%(color)s[%(levelname)1.1s %(asctime)s.%(msecs).03d" +
+                  " %(name)s %(module)s:%(lineno)d]%(end_color)s %(message)s")
+        for h in self.log.handlers:
+            h.setFormatter(logging.Formatter(fmt=logfmt))
 
         self.ptys_by_fd = {}
 
@@ -145,11 +149,11 @@ class TermManagerBase(object):
         else:
             import tornado.ioloop
             self.ioloop = tornado.ioloop.IOLoop.instance()
-        
+
     def make_term_env(self, height=25, width=80, winheight=0, winwidth=0, **kwargs):
         """Build the environment variables for the process in the terminal."""
         env = os.environ.copy()
-        env["TERM"] = self.term_settings.get("type",DEFAULT_TERM_TYPE)
+        env["TERM"] = self.term_settings.get("type", DEFAULT_TERM_TYPE)
         dimensions = "%dx%d" % (width, height)
         if winwidth and winheight:
             dimensions += ";%dx%d" % (winwidth, winheight)
@@ -172,7 +176,8 @@ class TermManagerBase(object):
         options.update(kwargs)
         argv = options['shell_command']
         env = self.make_term_env(**options)
-        pty = PtyProcessUnicode.spawn(argv, env=env, cwd=options.get('cwd', None))
+        pty = PtyProcessUnicode.spawn(
+            argv, env=env, cwd=options.get('cwd', None))
         return PtyWithClients(pty)
 
     def start_reading(self, ptywclients):
@@ -198,7 +203,10 @@ class TermManagerBase(object):
         ptywclients = self.ptys_by_fd[fd]
         try:
             s = ptywclients.ptyproc.read(65536)
+            self.log.error("Read from fd {}: {}".format(fd, s))
             ptywclients.read_buffer.append(s)
+            cll = ptyclients.clients
+            self.log.error("Clients for fd: {}".format(cll))
             for client in ptywclients.clients:
                 client.on_pty_read(s)
         except EOFError:

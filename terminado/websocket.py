@@ -81,7 +81,7 @@ class TermSocket(tornado.websocket.WebSocketHandler):
         #  process, because there's nothing to receive this message until
         #  the term socket is opened.  It _seems_ like the
         #  terminal.read_buffer should be doing this, but it isn't.
-        self._logger.error("on_pty_read: {}".format(text))
+        self._logger.error("websocket on_pty_read: {}".format(text))
         if not self.is_open:
             self.write_buffer.append(text)
             self._logger.info("Buffering output.")
