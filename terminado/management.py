@@ -10,7 +10,7 @@ import sys
 if sys.version_info[0] < 3:
     byte_code = ord
 else:
-    byte_code = lambda x: x
+    def byte_code(x): return x
     unicode = str
 
 from collections import deque
@@ -31,9 +31,19 @@ ENV_PREFIX = "PYXTERM_"         # Environment variable prefix
 
 DEFAULT_TERM_TYPE = "xterm"
 
+
+class PtyProcSetup(object):
+    def __init__(self, argv=None, env=None, cwd=None):
+        self.argv = argv
+        self.env = env
+        self.cwd = cwd
+
+
 class PtyWithClients(object):
-    def __init__(self, ptyproc):
-        self.ptyproc = ptyproc
+    def __init__(self, ptyproc_setup):
+        self.ptyproc = PtyProcessUnicode.spawn(argv=ptyproc_setup.argv,
+                                               env=ptyproc_setup.env,
+                                               cwd=ptyproc_setup.cwd)
         self.clients = []
         # Store the last few things read, so when a new client connects,
         # it can show e.g. the most recent prompt, rather than absolutely
@@ -42,7 +52,7 @@ class PtyWithClients(object):
 
     def resize_to_smallest(self):
         """Set the terminal size to that of the smallest client dimensions.
-        
+
         A terminal not using the full space available is much nicer than a
         terminal trying to use more than the available space, so we keep it 
         sized to the smallest client.
@@ -57,7 +67,7 @@ class PtyWithClients(object):
 
         if minrows == 10001 or mincols == 10001:
             return
-        
+
         rows, cols = self.ptyproc.getwinsize()
         if (rows, cols) != (minrows, mincols):
             self.ptyproc.setwinsize(minrows, mincols)
@@ -72,7 +82,7 @@ class PtyWithClients(object):
             return self.ptyproc.kill(sig)
         pgid = os.getpgid(self.ptyproc.pid)
         os.killpg(pgid, sig)
-    
+
     @gen.coroutine
     def terminate(self, force=False):
         '''This forces a child process to terminate. It starts nicely with
@@ -86,7 +96,7 @@ class PtyWithClients(object):
                        signal.SIGTERM]
 
         loop = IOLoop.current()
-        sleep = lambda : gen.sleep(self.ptyproc.delayafterterminate)
+        def sleep(): return gen.sleep(self.ptyproc.delayafterterminate)
 
         if not self.ptyproc.isalive():
             raise gen.Return(True)
@@ -115,6 +125,7 @@ class PtyWithClients(object):
             else:
                 raise gen.Return(False)
 
+
 def _update_removing(target, changes):
     """Like dict.update(), but remove keys where the value is None.
     """
@@ -124,8 +135,10 @@ def _update_removing(target, changes):
         else:
             target[k] = v
 
+
 class TermManagerBase(object):
     """Base class for a terminal manager."""
+
     def __init__(self, shell_command, server_url="", term_settings={},
                  extra_env=None, ioloop=None):
         self.shell_command = shell_command
@@ -141,11 +154,11 @@ class TermManagerBase(object):
         else:
             import tornado.ioloop
             self.ioloop = tornado.ioloop.IOLoop.instance()
-        
+
     def make_term_env(self, height=25, width=80, winheight=0, winwidth=0, **kwargs):
         """Build the environment variables for the process in the terminal."""
         env = os.environ.copy()
-        env["TERM"] = self.term_settings.get("type",DEFAULT_TERM_TYPE)
+        env["TERM"] = self.term_settings.get("type", DEFAULT_TERM_TYPE)
         dimensions = "%dx%d" % (width, height)
         if winwidth and winheight:
             dimensions += ";%dx%d" % (winwidth, winheight)
@@ -168,8 +181,9 @@ class TermManagerBase(object):
         options.update(kwargs)
         argv = options['shell_command']
         env = self.make_term_env(**options)
-        pty = PtyProcessUnicode.spawn(argv, env=env, cwd=options.get('cwd', None))
-        return PtyWithClients(pty)
+        cwd = options.get('cwd', None)
+        ptyproc_setup = PtyProcSetup(argv=argv, env=env, cwd=cwd)
+        return PtyWithClients(ptyproc_setup)
 
     def start_reading(self, ptywclients):
         """Connect a terminal to the tornado event loop to read data from it."""
