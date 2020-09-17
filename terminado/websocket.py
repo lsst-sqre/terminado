@@ -56,7 +56,7 @@ class TermSocket(tornado.websocket.WebSocketHandler):
         self.term_name = url_component or 'tty'
         self.terminal = self.term_manager.get_terminal(url_component)
         self.terminal.clients.append(self)
-        for s in self.terminal.read_buffer:
+        while self.terminal.read_buffer:
             text = self.terminal.read_buffer.pop()
             self.on_pty_read(text)
 
