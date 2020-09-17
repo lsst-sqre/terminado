@@ -52,9 +52,12 @@ class PtyWithClients(object):
         # it can show e.g. the most recent prompt, rather than absolutely
         # nothing.
         self.read_buffer = deque([], maxlen=10)
-        self.ptyproc = PtyProcessUnicode.spawn(argv=ptyproc_setup.argv,
-                                               env=ptyproc_setup.env,
-                                               cwd=ptyproc_setup.cwd)
+        argv = ptyproc_setup.argv
+        env = ptyproc_setup.env
+        cwd = ptyproc_setup.cwd
+        self.log("Pty: argv: '{}', env: '{}', cwd: '{}'".format(
+            argv, env, cwd))
+        self.ptyproc = PtyProcessUnicode.spawn(argv=argv, env=env, cwd=cwd)
 
     def resize_to_smallest(self):
         """Set the terminal size to that of the smallest client dimensions.
