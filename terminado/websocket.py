@@ -56,9 +56,13 @@ class TermSocket(tornado.websocket.WebSocketHandler):
         self.term_name = url_component or 'tty'
         self.terminal = self.term_manager.get_terminal(url_component)
         self.terminal.clients.append(self)
-        while self.terminal.read_buffer:
-            text = self.terminal.read_buffer.pop()
-            self.on_pty_read(text)
+        while True:
+            if self.terminal.read_buffer:
+                text = self.terminal.read_buffer.pop()
+                self._logger.info("Consuming read buffer: {}".format(text))
+                self.on_pty_read(text)
+            else:
+                break
 
         self.send_json_message(["setup", {}])
         self._logger.info("TermSocket.open: Opened %s", self.term_name)

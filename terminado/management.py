@@ -58,7 +58,7 @@ class PtyWithClients(object):
 
         if minrows == 10001 or mincols == 10001:
             return
-        
+
         rows, cols = self.ptyproc.getwinsize()
         if (rows, cols) != (minrows, mincols):
             self.ptyproc.setwinsize(minrows, mincols)
@@ -73,7 +73,7 @@ class PtyWithClients(object):
             return self.ptyproc.kill(sig)
         pgid = os.getpgid(self.ptyproc.pid)
         os.killpg(pgid, sig)
-    
+
     @gen.coroutine
     def terminate(self, force=False):
         '''This forces a child process to terminate. It starts nicely with
@@ -198,6 +198,7 @@ class TermManagerBase(object):
             client_list = ptywclients.clients
             if not client_list:
                 # buffer the read until we have somewhere to put it
+                self.log.error("Buffering read of: {}".format(s))
                 ptywclients.read_buffer.append(s)
                 return
             for client in ptywclients.clients:
