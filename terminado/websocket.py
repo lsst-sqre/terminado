@@ -18,18 +18,25 @@ import logging
 import tornado.web
 import tornado.websocket
 
+from collections import deque
+
+
 def _cast_unicode(s):
     if isinstance(s, bytes):
         return s.decode('utf-8')
     return s
 
+
 class TermSocket(tornado.websocket.WebSocketHandler):
     """Handler for a terminal websocket"""
+
     def initialize(self, term_manager):
         self.term_manager = term_manager
         self.term_name = ""
         self.size = (None, None)
         self.terminal = None
+        self.is_open = False
+        self.write_buffer = deque()
 
         self._logger = logging.getLogger(__name__)
 
@@ -39,7 +46,7 @@ class TermSocket(tornado.websocket.WebSocketHandler):
 
     def open(self, url_component=None):
         """Websocket connection opened.
-        
+
         Call our terminal manager to get a terminal, and connect to it as a
         client.
         """
@@ -52,6 +59,9 @@ class TermSocket(tornado.websocket.WebSocketHandler):
         url_component = _cast_unicode(url_component)
         self.term_name = url_component or 'tty'
         self.terminal = self.term_manager.get_terminal(url_component)
+        self.is_open = True
+        self.flush_write_buffer()
+        # Not sure we need the terminal read buffer?
         for s in self.terminal.read_buffer:
             self.on_pty_read(s)
         self.terminal.clients.append(self)
@@ -59,8 +69,24 @@ class TermSocket(tornado.websocket.WebSocketHandler):
         self.send_json_message(["setup", {}])
         self._logger.info("TermSocket.open: Opened %s", self.term_name)
 
+    def flush_write_buffer(self):
+        if not self.is_open:
+            self._logger.warning("No terminal is open; cannot drain buffer!")
+            return
+        while self.write_buffer:
+            self.on_pty_read(self.write_buffer.pop())
+
     def on_pty_read(self, text):
-        """Data read from pty; send to frontend"""
+        """Data read from pty; send to frontend or buffer"""
+        # We have a bit of an issue here: unless we also have a buffer
+        #  on the websocket side, we can lose data from our connected
+        #  process, because there's nothing to receive this message until
+        #  the term socket is opened.  It _seems_ like the
+        #  terminal.read_buffer should be doing this, but it isn't.
+        if not self.is_open:
+            self.write_buffer.append(text)
+            self._logger.info("Buffering output until terminal is open.")
+            return
         self.send_json_message(['stdout', text])
 
     def send_json_message(self, content):
@@ -69,13 +95,12 @@ class TermSocket(tornado.websocket.WebSocketHandler):
 
     def on_message(self, message):
         """Handle incoming websocket message
-        
+
         We send JSON arrays, where the first element is a string indicating
         what kind of message this is. Data associated with the message follows.
         """
-        ##logging.info("TermSocket.on_message: %s - (%s) %s", self.term_name, type(message), len(message) if isinstance(message, bytes) else message[:250])
         command = json.loads(message)
-        msg_type = command[0]    
+        msg_type = command[0]
 
         if msg_type == "stdin":
             self.terminal.ptyproc.write(command[1])
@@ -85,7 +110,7 @@ class TermSocket(tornado.websocket.WebSocketHandler):
 
     def on_close(self):
         """Handle websocket closing.
-        
+
         Disconnect from our terminal, and tell the terminal manager we're
         disconnecting.
         """
