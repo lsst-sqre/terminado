@@ -34,7 +34,8 @@ class TermSocket(tornado.websocket.WebSocketHandler):
         self._logger = logging.getLogger(__name__)
         logfmt = ("%(color)s[%(levelname)1.1s %(asctime)s.%(msecs).03d" +
                   " %(name)s %(module)s:%(lineno)d]%(end_color)s %(message)s")
-        self._logger.setFormatter(logging.Formatter(fmt=logfmt))
+        for h in self._logger.handlers:
+            h.setFormatter(logging.Formatter(fmt=logfmt))
 
     def origin_check(self, origin=None):
         """Deprecated: backward-compat for terminado <= 0.5."""
