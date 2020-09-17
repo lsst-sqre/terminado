@@ -87,7 +87,7 @@ class PtyWithClients(object):
                        signal.SIGTERM]
 
         loop = IOLoop.current()
-        sleep = lambda : gen.sleep(self.ptyproc.delayafterterminate)
+        def sleep(): return gen.sleep(self.ptyproc.delayafterterminate)
 
         if not self.ptyproc.isalive():
             raise gen.Return(True)
@@ -116,6 +116,7 @@ class PtyWithClients(object):
             else:
                 raise gen.Return(False)
 
+
 def _update_removing(target, changes):
     """Like dict.update(), but remove keys where the value is None.
     """
@@ -125,8 +126,10 @@ def _update_removing(target, changes):
         else:
             target[k] = v
 
+
 class TermManagerBase(object):
     """Base class for a terminal manager."""
+
     def __init__(self, shell_command, server_url="", term_settings={},
                  extra_env=None, ioloop=None):
         self.shell_command = shell_command
@@ -142,7 +145,7 @@ class TermManagerBase(object):
         else:
             import tornado.ioloop
             self.ioloop = tornado.ioloop.IOLoop.instance()
-        
+
     def make_term_env(self, height=25, width=80, winheight=0, winwidth=0, **kwargs):
         """Build the environment variables for the process in the terminal."""
         env = os.environ.copy()
@@ -198,7 +201,7 @@ class TermManagerBase(object):
             client_list = ptywclients.clients
             if not client_list:
                 # buffer the read until we have somewhere to put it
-                self.log.error("Buffering read of: {}".format(s))
+                self.log.error("Buffering read of: '{}'".format(s))
                 ptywclients.read_buffer.append(s)
                 return
             for client in ptywclients.clients:
