@@ -10,7 +10,7 @@ import sys
 if sys.version_info[0] < 3:
     byte_code = ord
 else:
-    byte_code = lambda x: x
+    def byte_code(x): return x
     unicode = str
 
 from collections import deque
@@ -31,18 +31,19 @@ ENV_PREFIX = "PYXTERM_"         # Environment variable prefix
 
 DEFAULT_TERM_TYPE = "xterm"
 
+
 class PtyWithClients(object):
     def __init__(self, ptyproc):
         self.ptyproc = ptyproc
         self.clients = []
-        # Store the last few things read, so when a new client connects,
-        # it can show e.g. the most recent prompt, rather than absolutely
-        # nothing.
-        self.read_buffer = deque([], maxlen=10)
+        # Rework of the read_buffer: if there are no clients, push the data
+        #  onto the read buffer.  The first client to connect will drain the
+        #  buffer.
+        self.read_buffer = deque([])
 
     def resize_to_smallest(self):
         """Set the terminal size to that of the smallest client dimensions.
-        
+
         A terminal not using the full space available is much nicer than a
         terminal trying to use more than the available space, so we keep it 
         sized to the smallest client.
@@ -194,7 +195,11 @@ class TermManagerBase(object):
         ptywclients = self.ptys_by_fd[fd]
         try:
             s = ptywclients.ptyproc.read(65536)
-            ptywclients.read_buffer.append(s)
+            client_list = ptywclients.clients
+            if not client_list:
+                # buffer the read until we have somewhere to put it
+                ptywclients.read_buffer.append(s)
+                return
             for client in ptywclients.clients:
                 client.on_pty_read(s)
         except EOFError:
